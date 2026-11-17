@@ -88,6 +88,7 @@ def parse_json_metadata(text: str) -> dict:
                 )
             field_id = str(raw_id).strip() if raw_id not in (None, "") else None
             type_raw = str(field.get("type") or "").strip() or "unknown"
+            unit_raw = field.get("unit") or field.get("amount_unit")
             columns.append(
                 {
                     "table": table_name,
@@ -95,6 +96,7 @@ def parse_json_metadata(text: str) -> dict:
                     "type_raw": type_raw,
                     "required": field.get("required"),
                     "field_id": field_id,
+                    "unit": str(unit_raw).strip() if unit_raw not in (None, "") else None,
                     "line": ordinal,
                 }
             )
@@ -112,10 +114,36 @@ def _is_known_type(type_raw: str) -> bool:
     )
 
 
-def fold_columns(columns: list[dict], version_label: str, source: str) -> dict:
+def _unit_diagnostic(column: dict, field_id: str | None, ruleset: str) -> dict | None:
+    """单位治理诊断：只在入口真正换算时留一条 info；未登记单位走历史默认，保持安静。
+
+    阻断性的单位问题（单位被改、单位登记缺失）不在采信层判，而在 M3 两版本比对时判，
+    因为单看一个版本无法知道量纲是否发生过变化。
+    """
+    from app import units
+
+    if not units.is_governed(field_id):
+        return None
+    probe = units.normalize_field_unit(
+        {"field_id": str(field_id), "unit": column.get("unit")}, ruleset
+    )
+    gov = probe.get("unit_governance") or {}
+    if gov.get("replay_conflict"):
+        return {"reason": "UNIT_UNDECLARED", "blocking": True,
+                "detail": gov["replay_conflict"]}
+    if gov.get("converted"):
+        return {"reason": "UNIT_CONVERTED", "blocking": False,
+                "detail": f"{gov['source_unit']} → {gov['canonical_unit']}，{gov['basis']}"}
+    return None
+
+
+def fold_columns(columns: list[dict], version_label: str, source: str,
+                 ruleset: str | None = None) -> dict:
     """把原始列折叠成可用的字段清单，并留下每条诊断。"""
+    from app import units
     from app.modules.m1_intake.ddl import detect_required_token
 
+    ruleset = ruleset or config.RULESET_VERSION
     accepted: list[dict] = []
     diagnostics: list[dict] = []
     seen_name: dict[tuple[str, str], dict] = {}
@@ -204,6 +232,20 @@ def fold_columns(columns: list[dict], version_label: str, source: str) -> dict:
                 }
             )
 
+        unit_diag = _unit_diagnostic(column, field_id, ruleset)
+        if unit_diag is not None:
+            diagnostics.append(
+                {
+                    "line": column["line"],
+                    "table": table,
+                    "column": name,
+                    "reason": unit_diag["reason"],
+                    "blocking": unit_diag["blocking"],
+                    "detail": unit_diag["detail"],
+                    "raw": f"{table}.{name}",
+                }
+            )
+
         field = {
             "field_id": field_id,
             "table": table,
@@ -215,6 +257,8 @@ def fold_columns(columns: list[dict], version_label: str, source: str) -> dict:
             "version": version_label,
             "source": source,
         }
+        # 单位治理在入口完成：后续阶段只看到标准单位，原始单位留在治理块里。
+        field = units.normalize_field_unit({**field, "unit": column.get("unit")}, ruleset)
         accepted.append(field)
         seen_name[key] = field
         seen_id[field_id] = field

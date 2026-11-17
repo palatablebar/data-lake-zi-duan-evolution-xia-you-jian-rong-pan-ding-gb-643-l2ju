@@ -71,9 +71,20 @@
 
 ## 8 账目
 
-- 旧版本字段数 = 未变 + 改名 + 换类型 + 改必填 + 冲突 + 删除
-- 新版本字段数 = 未变 + 改名 + 换类型 + 改必填 + 冲突 + 新增
+- 旧版本字段数 = 未变 + 改名 + 换类型 + 单位变更 + 改必填 + 冲突 + 删除
+- 新版本字段数 = 未变 + 改名 + 换类型 + 单位变更 + 改必填 + 冲突 + 新增
 - 登记引用 = 可达 + 断链；可达 = 直接 + 经别名
 - 列定义行 = 接受字段 + 阻断行
 
 每个字段只进一个桶，所以四个等式成立是必要条件；差额不为 0 即判定漏项。
+
+## 9 单位治理（金额字段）
+
+- 裁定：上游金额字段的单位变更只由 **M1 采信入口**承担一次。M2/M3/M4/M5/M7 与所有页面、导出只读到湖仓标准单位 `CNY_YUAN`（元），任何消费方不得自行换算。
+- 单位登记在 `app/units.py` 的 `GOVERNED_FIELDS`（按 `field_id`），因子表 `UNIT_FACTORS` 用 `Decimal` 常量；归一值 = 原始值 / 因子，例如分 → 元：`123 / 100 = 1.23`。
+- 每个被治理字段在快照里带 `unit_governance` 块：`source_unit`（原始登记单位）、`canonical_unit`（标准单位）、`factor`、`converted`、`already_canonical`、`undeclared`、`assumed`、`basis`、`ruleset`。原始单位与换算依据随快照保留，不覆盖历史口径。
+- 幂等：记录已带治理块再次进入（历史回写 / 补数）走快路，原样保留治理块并标 `replayed`；已是标准单位的补数标 `idempotency_code=UNIT_ALREADY_CANONICAL`、`converted=false`，绝不二次换算。
+- 历史样例未显式登记单位时按标准单位（元）采信，`assumed=true`，采信不阻断、不发换算诊断；若旧版显式有单位而新版退化成不登记，M3 判 `UNIT_UNDECLARED`（破坏）。
+- M3 单位差异：显式单位不同判 `UNIT_SCALED`（break），进独立桶 `rescaled`，读者 / 写者均不通过，修复动作 `convert_at_intake`；其优先级高于 `TYPE_WIDEN`/`TYPE_NARROW`，类型即使放宽也不放行。
+- 批次 `unit_governance.release`：存在单位变更破坏项为 `BLOCKED`，否则 `PASS`；该结论同时出现在首页、映射页、批次页、迁移单页、四份导出与 `manifest.json`，以及 `GET /api/units/governance`。
+- 回滚：切回上一版只读旧快照的原始单位原值，重放不再次换算；同输入重跑命中批次键，整批只保留一份结论。

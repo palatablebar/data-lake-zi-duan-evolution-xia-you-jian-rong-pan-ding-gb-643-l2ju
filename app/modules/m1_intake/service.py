@@ -14,7 +14,13 @@ def _schema_id(version_label: str, fields: list[dict]) -> str:
         {
             "version": version_label,
             "fields": [
-                [f["table"], f["field_id"], f["name"], f["type_raw"], f["required"]]
+                [
+                    f["table"], f["field_id"], f["name"], f["type_raw"], f["required"],
+                    (f.get("unit_governance") or {}).get("source_unit"),
+                    (f.get("unit_governance") or {}).get("canonical_unit"),
+                    (f.get("unit_governance") or {}).get("factor"),
+                    (f.get("unit_governance") or {}).get("converted"),
+                ]
                 for f in fields
             ],
         },
@@ -39,6 +45,38 @@ def _stats(diagnostics: list[dict], parsed_columns: int, accepted: int, tables: 
     }
 
 
+def _unit_report(fields: list[dict], diagnostics: list[dict]) -> dict:
+    """单位治理摘要：哪些金额字段在入口换算了、哪些本就是标准单位。"""
+    from app import units
+
+    governed = [f.get("unit_governance") for f in fields
+                if isinstance(f.get("unit_governance"), dict)]
+    converted = [g for g in governed if g.get("converted")]
+    already = [g for g in governed if g.get("already_canonical")]
+    undeclared = [g for g in governed if g.get("undeclared")]
+    return {
+        "canonical_unit": units.CANONICAL_UNIT,
+        "governed_fields": len(governed),
+        "converted_fields": len(converted),
+        "already_canonical_fields": len(already),
+        "undeclared_fields": len(undeclared),
+        "conversion_diagnostics": sum(
+            1 for row in diagnostics if row.get("reason") == "UNIT_CONVERTED"
+        ),
+        "items": [
+            {
+                "field_id": g.get("field_id"),
+                "source_unit": g.get("source_unit"),
+                "canonical_unit": g.get("canonical_unit"),
+                "factor": g.get("factor"),
+                "converted": bool(g.get("converted")),
+                "basis": g.get("basis"),
+            }
+            for g in governed
+        ],
+    }
+
+
 def ingest(rel_name: str) -> dict:
     """采信一份元数据文件，返回快照并写入 SQLite。"""
     path = config.resolve_sample(rel_name)
@@ -50,7 +88,8 @@ def ingest(rel_name: str) -> dict:
         parsed = sheet.parse_json_metadata(raw.text)
 
     version_label = parsed["version"] or path.stem
-    folded = sheet.fold_columns(parsed["columns"], version_label, raw.name)
+    folded = sheet.fold_columns(parsed["columns"], version_label, raw.name,
+                                ruleset=config.RULESET_VERSION)
 
     diagnostics = list(parsed["issues"]) + list(folded["diagnostics"])
     if raw.bom:
@@ -93,6 +132,7 @@ def ingest(rel_name: str) -> dict:
     fields = folded["fields"]
     stats = _stats(diagnostics, len(parsed["columns"]), len(fields),
                    folded["stats"]["tables"])
+    unit_report = _unit_report(fields, diagnostics)
     snapshot = {
         "schema_id": _schema_id(version_label, fields),
         "version_label": version_label,
@@ -108,6 +148,7 @@ def ingest(rel_name: str) -> dict:
         "diagnostics": diagnostics,
         "tables": parsed["tables"],
         "stats": stats,
+        "unit_report": unit_report,
         "field_count": len(fields),
         "blocked_count": stats["blocked"],
     }

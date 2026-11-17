@@ -4,6 +4,17 @@
 <section class="doc-section">
   <h1>规格单</h1>
   <p class="lede">字段 <span class="mono">{{ counts.old_total or 0 }}</span> → <span class="mono">{{ counts.new_total or 0 }}</span>　破坏 <span class="mono">{{ counts.breaking or 0 }}</span>　断链 <span class="mono">{{ counts.refs_broken or 0 }}</span></p>
+  {% if run and run.get('unit_governance') %}
+  {% set ug = run['unit_governance'] %}
+  <div class="unit-banner {% if ug.release == 'BLOCKED' %}unit-bad{% else %}unit-ok{% endif %}">
+    <strong>单位裁定：</strong>单位变更由 <span class="mono">{{ ug.owner_stage }}</span> 采信入口统一换算，
+    湖仓标准单位 <span class="mono">{{ ug.canonical_unit }}</span>；
+    入口换算 <span class="mono">{{ ug.new_report.converted_fields or 0 }}</span> 个、
+    本就标准 <span class="mono">{{ ug.new_report.already_canonical_fields or 0 }}</span> 个、
+    单位变更破坏 <span class="mono">{{ ug.rescaled_count }}</span> 个。
+    放行结论：<strong>{{ '阻断（必须先在入口归一）' if ug.release == 'BLOCKED' else '放行' }}</strong>
+  </div>
+  {% endif %}
   <div class="actions">
     <button type="button" data-action="import">采信样例</button>
     <a class="btn ghost" href="/api/schemas/quarantine.csv">隔离区 CSV</a>
@@ -22,6 +33,7 @@
           <th>表</th>
           <th>字段</th>
           <th>类型</th>
+          <th>单位（原始→标准）</th>
           <th>必填</th>
           <th>状态</th>
           <th>原因</th>
@@ -42,6 +54,14 @@
             <span class="from">{{ row.old_type }}</span> → {{ row.new_type }}
             {% elif row.old_type %}{{ row.old_type }}
             {% else %}{{ row.new_type }}{% endif %}
+          </td>
+          <td class="name">
+            {% if row.old_unit or row.new_unit %}
+              {% if row.unit_change == 'rescaled' %}
+              <span class="from">{{ row.old_unit }}</span> → {{ row.canonical_unit }}
+              <span class="code" title="{{ row.unit_basis }}">入口换算</span>
+              {% else %}{{ row.new_unit or row.canonical_unit or '—' }}{% endif %}
+            {% else %}—{% endif %}
           </td>
           <td>{% if row.new_required is none %}—{% elif row.new_required %}是{% else %}否{% endif %}</td>
           <td>
@@ -90,6 +110,7 @@
   <ol class="footnotes">
     <li id="fn1">按 field_id 对齐，改名不算新字段。<a class="back" href="#main">↩</a></li>
     <li id="fn2">阻断行不进判定，提示行照常参算。<a class="back" href="#main">↩</a></li>
+    <li id="fn3">金额单位只在采信入口归一一次；原始单位与换算依据随快照保留，历史回放不二次换算。<a class="back" href="#main">↩</a></li>
   </ol>
 </aside>
 {% endblock %}

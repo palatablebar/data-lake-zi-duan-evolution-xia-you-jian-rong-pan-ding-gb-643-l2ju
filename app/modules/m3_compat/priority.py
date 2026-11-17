@@ -13,6 +13,9 @@ PRIORITY: dict[str, int] = {
     "NAME_DUP_DIFF_ID": 20,
     "TYPE_CROSS_FAMILY": 30,
     "TYPE_UNKNOWN": 35,
+    # 单位变更是本次裁定的主因：即使伴随类型收窄，也先报量纲口径变化。
+    "UNIT_SCALED": 37,
+    "UNIT_UNDECLARED": 38,
     "TYPE_NARROW": 40,
     "REQUIRED_TIGHTENED": 50,
     "ALIAS_CYCLE": 55,

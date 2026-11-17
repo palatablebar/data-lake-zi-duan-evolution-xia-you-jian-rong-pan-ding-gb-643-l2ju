@@ -11,7 +11,7 @@
     <table>
       <caption>旧名到新名</caption>
       <thead>
-        <tr><th>表</th><th>旧名</th><th>新名</th><th>类型</th><th>映射</th><th>结论</th></tr>
+        <tr><th>表</th><th>旧名</th><th>新名</th><th>类型</th><th>单位（原始→标准）</th><th>映射</th><th>结论</th></tr>
       </thead>
       <tbody>
         {% for row in mapping.get('rows', []) %}
@@ -20,6 +20,12 @@
           <td class="name">{{ row.old_name }}</td>
           <td class="name">{{ row.new_name }}</td>
           <td class="name">{{ row.old_type }} → {{ row.new_type }}</td>
+          <td class="name">
+            {% if row.unit_change == 'rescaled' %}
+            <span class="from">{{ row.old_unit }}</span> → {{ row.canonical_unit }}
+            {% elif row.new_unit or row.canonical_unit %}{{ row.new_unit or row.canonical_unit }}
+            {% else %}—{% endif %}
+          </td>
           <td>
             {% if row.status == 'conflict' %}<span class="st st-bad">冲突</span>
             {% elif row.status == 'renamed' %}<span class="st st-warn">改名</span>

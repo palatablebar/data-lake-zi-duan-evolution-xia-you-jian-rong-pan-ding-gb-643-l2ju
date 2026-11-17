@@ -4,6 +4,14 @@
 <section class="doc-section">
   <h1>迁移单</h1>
   <p class="lede">条款 <span class="mono">{{ clauses|length }}</span>　破坏 <span class="mono">{{ ledger.counts.breaking or 0 }}</span>　断链 <span class="mono">{{ ledger.counts.refs_broken or 0 }}</span></p>
+  {% if run and run.get('unit_governance') %}
+  {% set ug = run['unit_governance'] %}
+  <div class="unit-banner {% if ug.release == 'BLOCKED' %}unit-bad{% else %}unit-ok{% endif %}">
+    <strong>单位裁定：</strong>承担环节 <span class="mono">{{ ug.owner_stage }}</span>（采信入口统一换算），
+    标准单位 <span class="mono">{{ ug.canonical_unit }}</span>，单位变更条款 <span class="mono">{{ ug.rescaled_count }}</span> 条，
+    放行结论：<strong>{{ '阻断' if ug.release == 'BLOCKED' else '放行' }}</strong>。补数命中标准单位不二次换算，回滚只读原始单位原值。
+  </div>
+  {% endif %}
   <div class="actions">
     <a class="btn" href="/api/export/spec.md">迁移单 MD</a>
     <a class="btn ghost" href="/api/export/fields.csv">字段账 CSV</a>
@@ -20,6 +28,9 @@
     <h3><span class="mono">{{ item.no }}</span> {{ item.table }}.{{ item.old_name or '—' }} → {{ item.new_name or '—' }}</h3>
     <p class="meta">原因 <span class="mono">{{ item.primary }}</span>（{{ item.primary_label }}）</p>
     <p class="meta">类型 <span class="mono">{{ item.old_type or '—' }} → {{ item.new_type or '—' }}</span>　变化 {{ item.change }}</p>
+    {% if item.unit_change == 'rescaled' %}
+    <p class="meta">单位 <span class="mono">{{ item.old_unit }} → {{ item.canonical_unit }}</span>（标准单位）　{{ item.unit_basis }}</p>
+    {% endif %}
     <p class="meta">读者 {% if item.reader_ok %}通过{% else %}不通过{% endif %}　写者 {% if item.writer_ok %}通过{% else %}不通过{% endif %}　引用 {{ item.ref_count }} 处</p>
   </article>
   {% endfor %}
@@ -54,6 +65,7 @@
   <ol class="footnotes">
     <li>条款号与导出的 Markdown 一致。<a class="back" href="#main">↩</a></li>
     <li>账目差额不为 0 说明判定漏项。<a class="back" href="#main">↩</a></li>
+    <li>金额单位变更只在采信入口归一一次；原始单位随快照保留，回滚与补数不二次换算。<a class="back" href="#main">↩</a></li>
   </ol>
 </aside>
 {% endblock %}

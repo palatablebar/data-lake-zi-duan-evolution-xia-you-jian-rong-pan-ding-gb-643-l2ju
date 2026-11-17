@@ -35,6 +35,40 @@ def _json_safe(resolution: dict) -> dict:
     return out
 
 
+def _unit_governance(old_snapshot: dict, new_snapshot: dict, diff: dict) -> dict:
+    """一次批次的单位治理总览：入口换算登记 + 单位变更破坏项，页面与导出共用这一份。"""
+    from app import units
+
+    rescaled = [
+        {
+            "field_id": row["field_id"],
+            "table": row["table"],
+            "old_name": row.get("old_name"),
+            "new_name": row.get("new_name"),
+            "old_unit": row.get("old_unit"),
+            "new_unit": row.get("new_unit"),
+            "canonical_unit": row.get("canonical_unit"),
+            "factor": (row.get("unit_evidence") or {}).get("factor"),
+            "reason": (row.get("unit_evidence") or {}).get("reason"),
+            "basis": row.get("unit_basis"),
+            "verdict": row["verdict"],
+            "reader_ok": row["reader_ok"],
+            "writer_ok": row["writer_ok"],
+        }
+        for row in diff["rows"] if row.get("unit_change") == "rescaled"
+    ]
+    return {
+        "canonical_unit": units.CANONICAL_UNIT,
+        "owner_stage": "M1_intake",
+        "rule": "单位变更只在采信入口归一一次，下游与页面只读标准单位",
+        "old_report": old_snapshot.get("unit_report") or {},
+        "new_report": new_snapshot.get("unit_report") or {},
+        "rescaled_count": len(rescaled),
+        "rescaled": rescaled,
+        "release": "BLOCKED" if rescaled else "PASS",
+    }
+
+
 def _edges(old_snapshot: dict, new_snapshot: dict, diff: dict,
            base_snapshot: dict | None) -> dict:
     allowed = {row["field_id"] for row in diff["rows"] if row["bucket"] == "renamed"}
@@ -101,6 +135,7 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
     mapping_table = mapping.build_mapping(old_snapshot["fields"], new_snapshot["fields"], diff)
     impact_payload = impact.build(diff, refs["consumers"], resolution)
     ledger = migration.build_ledger(diff, refs["consumers"], resolution)
+    unit_governance = _unit_governance(old_snapshot, new_snapshot, diff)
 
     warnings = guard.overlap_warnings(window, store.list_windows())
     created_at = config.now_utc().isoformat()
@@ -142,6 +177,7 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
         "resolution": _json_safe(resolution),
         "impact": impact_payload,
         "ledger": ledger,
+        "unit_governance": unit_governance,
         "quarantine": ([dict(row, side="old") for row in old_snapshot["diagnostics"]]
                        + [dict(row, side="new") for row in new_snapshot["diagnostics"]]),
         "quarantine_old": old_snapshot["diagnostics"],

@@ -23,6 +23,10 @@ def reader(state: dict) -> dict:
                 "repair": "manual"}
     if state.get("deleted_referenced"):
         return {"ok": False, "reason": "FIELD_DELETED_REFERENCED", "repair": "keep_field"}
+    if state.get("unit_changed"):
+        # 读者按旧单位解释新数据会把金额放大/缩小，必须在入口换算后才放行。
+        return {"ok": False, "reason": state.get("unit_reason") or "UNIT_SCALED",
+                "repair": "convert_at_intake"}
     change = state.get("type_change")
     if change in ("narrow", "cross_family", "unknown"):
         return {"ok": False, "reason": state.get("primary") or "TYPE_NARROW", "repair": None}
@@ -38,6 +42,10 @@ def writer(state: dict) -> dict:
     if state.get("conflict"):
         return {"ok": False, "reason": state.get("primary") or "RENAME_AND_RETYPE",
                 "repair": "manual"}
+    if state.get("unit_changed"):
+        # 写者若沿用旧口径写入，落库的量纲与新单位不一致，同样要求入口归一。
+        return {"ok": False, "reason": state.get("unit_reason") or "UNIT_SCALED",
+                "repair": "convert_at_intake"}
     change = state.get("type_change")
     if change in ("narrow", "cross_family", "unknown"):
         return {"ok": False, "reason": state.get("primary") or "TYPE_NARROW", "repair": None}

@@ -7,10 +7,13 @@
 
 from __future__ import annotations
 
-BUCKETS = ("unchanged", "renamed", "retyped", "required", "conflict", "deleted", "added")
+BUCKETS = ("unchanged", "renamed", "retyped", "rescaled", "required",
+           "conflict", "deleted", "added")
 
-OLD_SIDE = ("unchanged", "renamed", "retyped", "required", "conflict", "deleted")
-NEW_SIDE = ("unchanged", "renamed", "retyped", "required", "conflict", "added")
+OLD_SIDE = ("unchanged", "renamed", "retyped", "rescaled", "required",
+            "conflict", "deleted")
+NEW_SIDE = ("unchanged", "renamed", "retyped", "rescaled", "required",
+            "conflict", "added")
 
 
 def field_ledger(diff: dict) -> dict:

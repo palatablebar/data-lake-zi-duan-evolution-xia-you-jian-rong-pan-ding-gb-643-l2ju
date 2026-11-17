@@ -42,6 +42,7 @@ docker compose up -d --build
 | POST | `/api/schemas/import` | 采信样例文件，返回快照摘要与诊断 |
 | GET | `/api/schemas/quarantine` | 隔离区 JSON |
 | GET | `/api/schemas/quarantine.csv` | 隔离区 CSV |
+| GET | `/api/units/governance` | 单位裁定依据：承担环节、标准单位、因子、批次放行结论 |
 | GET | `/api/types` | 类型格与别名表 |
 | POST | `/api/types/compare` | 两个类型写法比较 |
 | POST | `/api/compat` | 一对版本的两向判定 |

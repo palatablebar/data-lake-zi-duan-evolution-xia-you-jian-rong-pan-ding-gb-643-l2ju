@@ -196,3 +196,17 @@ input[type="text"], input[type="search"] {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* 单位裁定横幅：入口换算依据与放行结论，各页面共用同一套视觉 */
+.unit-banner {
+  border: var(--rule-w) solid var(--rule);
+  border-left-width: 4px;
+  padding: 10px 14px;
+  margin: 6px 0 14px;
+  font-size: var(--step-1);
+  line-height: 1.7;
+  background: transparent;
+}
+.unit-banner.unit-ok { border-left-color: var(--ok, #2e7d32); }
+.unit-banner.unit-bad { border-left-color: var(--bad, #c62828); }
+.unit-banner .code { white-space: nowrap; }

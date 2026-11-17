@@ -25,6 +25,11 @@ CODES: dict[str, tuple[str, str]] = {
     "TYPE_NARROW": ("类型收窄", "break"),
     "TYPE_CROSS_FAMILY": ("跨族类型替换", "break"),
     "TYPE_UNKNOWN": ("类型不可比对", "break"),
+    # 单位治理（入口换算，M3 判破坏）
+    "UNIT_SCALED": ("计量单位变更，数值口径不再相同", "break"),
+    "UNIT_UNDECLARED": ("金额字段未登记单位，禁止裸读", "break"),
+    "UNIT_CONVERTED": ("入口已按单位登记归一换算", "info"),
+    "UNIT_ALREADY_CANONICAL": ("已是标准单位，补数未重复换算", "info"),
     # 命名与必填
     "RENAME_ONLY": ("仅改名", "info"),
     "RENAME_CASE_ONLY": ("仅大小写改名", "info"),

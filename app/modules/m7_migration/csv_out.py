@@ -13,6 +13,7 @@ FIELD_HEADER = [
     "field_id", "table", "old_name", "new_name", "old_type", "new_type",
     "change", "type_detail", "required_change", "reader", "writer", "verdict",
     "primary_reason", "bucket", "ref_count", "line_old", "line_new",
+    "old_unit", "new_unit", "canonical_unit", "unit_basis",
 ]
 
 REF_HEADER = ["consumer", "kind", "ref", "table", "column", "via", "field_id", "reason"]
@@ -45,6 +46,10 @@ def fields_csv(rows: list[dict]) -> str:
             str(row.get("ref_count", 0)),
             str(row.get("line_old") or ""),
             str(row.get("line_new") or ""),
+            row.get("old_unit") or "",
+            row.get("new_unit") or "",
+            row.get("canonical_unit") or "",
+            row.get("unit_basis") or "",
         ])
     return buffer.getvalue()
 
@@ -66,8 +71,8 @@ def ledger_csv(ledger: dict) -> str:
     buffer, writer = _buffer()
     writer.writerow(["item", "value"])
     buckets = ledger.get("buckets") or {}
-    for name in ("old_total", "unchanged", "renamed", "retyped", "required",
-                 "conflict", "deleted", "added", "new_total"):
+    for name in ("old_total", "unchanged", "renamed", "retyped", "rescaled",
+                 "required", "conflict", "deleted", "added", "new_total"):
         value = buckets.get(name, ledger.get("fields", {}).get(name, 0))
         writer.writerow([name, value])
     refs = ledger.get("refs") or {}

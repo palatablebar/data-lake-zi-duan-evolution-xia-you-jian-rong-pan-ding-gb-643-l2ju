@@ -26,6 +26,8 @@ def summary_of(run: dict) -> dict:
         "balanced": bool(balanced.get("all")),
         "reused": bool(run.get("reused")),
         "warnings": len(run.get("warnings") or []),
+        "unit_release": (run.get("unit_governance") or {}).get("release", "PASS"),
+        "unit_rescaled": (run.get("unit_governance") or {}).get("rescaled_count", 0),
     }
 
 

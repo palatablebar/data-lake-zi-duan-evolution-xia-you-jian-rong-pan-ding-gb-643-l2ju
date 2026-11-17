@@ -53,6 +53,7 @@ def test_fields_csv_rows_and_reasons(run):
         "field_id", "table", "old_name", "new_name", "old_type", "new_type",
         "change", "type_detail", "required_change", "reader", "writer", "verdict",
         "primary_reason", "bucket", "ref_count", "line_old", "line_new",
+        "old_unit", "new_unit", "canonical_unit", "unit_basis",
     }
     by_name = {row["old_name"]: row for row in rows if row["old_name"]}
     assert by_name["pay_amt"]["verdict"] == "BREAKING"

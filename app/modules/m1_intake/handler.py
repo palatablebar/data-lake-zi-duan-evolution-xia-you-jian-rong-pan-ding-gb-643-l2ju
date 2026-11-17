@@ -64,3 +64,26 @@ def quarantine_csv(schema_id: str | None = None):
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="fieldmap-quarantine.csv"'},
     )
+
+
+@router.get("/api/units/governance")
+def unit_governance():
+    """单位裁定的统一依据：承担环节、标准单位、当前批次的换算与放行结论。"""
+    from app import reasons, units
+
+    run = store.latest_run()
+    payload = {
+        "owner_stage": "M1_intake",
+        "rule": "单位变更只在采信入口归一一次，下游与页面只读标准单位",
+        "canonical_unit": units.CANONICAL_UNIT,
+        "governed_field_ids": sorted(units.GOVERNED_FIELDS),
+        "unit_factors": {code: str(factor) for code, factor in units.UNIT_FACTORS.items()},
+        "reason_codes": {
+            code: {"label": reasons.label(code), "severity": reasons.severity(code)}
+            for code in units.unit_reason_codes()
+        },
+    }
+    if run:
+        payload["run_id"] = run["run_id"]
+        payload["batch"] = run.get("unit_governance") or {}
+    return payload

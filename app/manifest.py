@@ -39,6 +39,7 @@ def run_id_for(key: str) -> str:
 
 
 def build_manifest(run: dict, created_at: datetime) -> dict:
+    unit = run.get("unit_governance") or {}
     return {
         "run_id": run["run_id"],
         "batch_key": run["batch_key"],
@@ -54,4 +55,11 @@ def build_manifest(run: dict, created_at: datetime) -> dict:
         "created_at_local": config.to_local_text(created_at),
         "counts": run["ledger"].get("counts", {}),
         "balanced": run["ledger"].get("balanced", {}),
+        "unit_governance": {
+            "owner_stage": unit.get("owner_stage", "M1_intake"),
+            "canonical_unit": unit.get("canonical_unit"),
+            "rescaled_count": unit.get("rescaled_count", 0),
+            "release": unit.get("release", "PASS"),
+            "rescaled": unit.get("rescaled", []),
+        },
     }

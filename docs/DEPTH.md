@@ -30,11 +30,12 @@
 | TRAP-22 | 同一字段被连续改过两次名 | 只认最近一跳，最早的名字解析不到 | 跨版本改名链一路解析到底 | `app/modules/m4_mapping/rename.py` | `tests/test_m4_mapping.py::test_trap22_alias_chain_resolves_multi_hop` |
 | TRAP-25 | 两个版本生效区间重叠 | 取到哪版看运气 | 半开区间比较，重叠直接标记警告 | `app/modules/m6_batches/window.py` | `tests/test_m6_batches.py::test_trap25_overlap_flagged_but_adjacent_clean` |
 | TRAP-26 | 基于旧版本号提交 | 后提交无条件覆盖新结果 | 版本号乐观锁，基线落后即 409 | `app/modules/m6_batches/guard.py` | `tests/test_m6_batches.py::test_trap26_stale_submission_rejected` |
+| TRAP-31 | 上游把金额单位从元改成 分，类型仍是 decimal | 类型格判放宽/相同，全部下游误判兼容，月底结算放大百倍 | 单位变更由 M1 入口按 Decimal 因子唯一归一，M3 加 `UNIT_SCALED` 判破坏，治理块留原始单位防重复换算 | `app/units.py` `app/modules/m1_intake/sheet.py` `app/modules/m3_compat/judge.py` | `tests/test_units.py` |
 
 ## 对账规则
 
-- 字段账：旧版本 = 未变 + 改名 + 换类型 + 改必填 + 冲突 + 删除
-- 字段账：新版本 = 未变 + 改名 + 换类型 + 改必填 + 冲突 + 新增
+- 字段账：旧版本 = 未变 + 改名 + 换类型 + 单位变更 + 改必填 + 冲突 + 删除
+- 字段账：新版本 = 未变 + 改名 + 换类型 + 单位变更 + 改必填 + 冲突 + 新增
 - 引用账：登记引用 = 可达 + 断链，其中可达 = 直接 + 经别名
 - 采信账：列定义行 = 接受字段 + 阻断行
 - 页面上四账并列显示，差额不为 0 即判不平

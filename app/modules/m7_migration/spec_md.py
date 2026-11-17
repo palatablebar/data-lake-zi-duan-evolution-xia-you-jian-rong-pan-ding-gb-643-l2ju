@@ -9,6 +9,7 @@ FOOTNOTES = [
     "类型放宽指新类型能无损容纳旧类型的全部取值。",
     f"生效区间按 {config.WINDOW_SEMANTICS} 处理。",
     "账目差额应为 0；不为 0 说明判定漏项。",
+    "金额单位变更只在采信入口归一一次；原始单位与换算依据随快照保留，历史回放不二次换算。",
 ]
 
 
@@ -34,6 +35,11 @@ def clauses(run: dict) -> list[dict]:
             "writer_ok": row["writer_ok"],
             "ref_count": row["ref_count"],
             "reasons": row["reasons"],
+            "old_unit": row.get("old_unit"),
+            "new_unit": row.get("new_unit"),
+            "canonical_unit": row.get("canonical_unit"),
+            "unit_basis": row.get("unit_basis"),
+            "unit_change": row.get("unit_change"),
         })
     return out
 
@@ -75,6 +81,7 @@ def render(run: dict) -> str:
              ["未变", buckets.get("unchanged", 0)],
              ["改名", buckets.get("renamed", 0)],
              ["换类型", buckets.get("retyped", 0)],
+             ["单位变更", buckets.get("rescaled", 0)],
              ["改必填", buckets.get("required", 0)],
              ["冲突", buckets.get("conflict", 0)],
              ["删除", buckets.get("deleted", 0)],
@@ -101,6 +108,13 @@ def render(run: dict) -> str:
         parts.append(f"- 原因码：{item['primary']}（{item['primary_label']}）")
         parts.append(f"- 类型：{item['old_type'] or '—'} → {item['new_type'] or '—'}"
                      f"，变化 {item['change']}")
+        if item.get("unit_change") == "rescaled":
+            from app import units
+            old_label = units.unit_label(item.get("old_unit"))
+            new_label = units.unit_label(item.get("new_unit"))
+            parts.append(f"- 单位登记：{old_label} → {new_label}"
+                         f"（湖仓内部标准单位 {units.unit_label(item.get('canonical_unit'))}）")
+            parts.append(f"- 换算依据：{item.get('unit_basis') or '入口统一归一'}[^5]")
         parts.append(f"- 读者：{'通过' if item['reader_ok'] else '不通过'}"
                      f"；写者：{'通过' if item['writer_ok'] else '不通过'}")
         parts.append(f"- 下游引用：{item['ref_count']} 处")
@@ -139,6 +153,7 @@ def render(run: dict) -> str:
         "1. 按第 4 节建兼容视图，旧名字继续可用。",
         "2. 破坏项逐个补默认值或改类型，再重跑判定。",
         "3. 版本切回上一版，生效区间端点保持半开。",
+        "4. 单位回滚只读快照里的原始单位原值，重放不再次换算；补数命中标准单位直接跳过。",
         "",
     ])
     for index, note in enumerate(FOOTNOTES, start=1):

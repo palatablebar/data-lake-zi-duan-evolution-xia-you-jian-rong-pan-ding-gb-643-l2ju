@@ -15,6 +15,8 @@ CREATE_RE = re.compile(
     re.IGNORECASE,
 )
 FID_RE = re.compile(r"fid\s*=\s*(?P<fid>[0-9]+)", re.IGNORECASE)
+# 单位写在列注释里，例如 -- fid=1004, unit=fen 或 -- unit=分
+UNIT_RE = re.compile(r"unit\s*=\s*(?P<unit>[A-Za-z_一-龥]+)", re.IGNORECASE)
 VERSION_RE = re.compile(r"v(?P<year>\d{4})[_\-]?(?P<month>\d{2})", re.IGNORECASE)
 COLUMN_RE = re.compile(
     r"^(?P<name>`[^`]+`|\"[^\"]+\"|[A-Za-z_\u4e00-\u9fa5][\w\u4e00-\u9fa5$]*)\s+"
@@ -99,6 +101,8 @@ def parse_ddl(lines: tuple[tuple[int, str], ...]) -> dict:
 
         fid_match = FID_RE.search(comment_part) or FID_RE.search(code)
         fid = fid_match.group("fid") if fid_match else None
+        unit_match = UNIT_RE.search(comment_part) or UNIT_RE.search(code)
+        unit = unit_match.group("unit") if unit_match else None
         body = code
         if body.endswith(","):
             body = body[:-1].rstrip()
@@ -140,6 +144,7 @@ def parse_ddl(lines: tuple[tuple[int, str], ...]) -> dict:
                 "type_raw": " ".join(match.group("type").split()),
                 "required": required_from_rest(rest),
                 "field_id": str(fid) if fid else None,
+                "unit": unit,
                 "line": lineno,
             }
         )

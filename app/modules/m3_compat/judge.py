@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from app import units
 from app.modules.m2_types import service as type_service
 from app.modules.m3_compat import direction, priority
 
@@ -64,6 +65,12 @@ def _base_row(field_id: str, table: str) -> dict:
         "table_changed": False,
         "name_clash": False,
         "type_evidence": {},
+        "unit_change": "same",
+        "old_unit": None,
+        "new_unit": None,
+        "canonical_unit": None,
+        "unit_basis": None,
+        "unit_evidence": {},
     }
 
 
@@ -118,6 +125,7 @@ def _added(new: dict, clash: bool) -> dict:
 def judge_field(old: dict, new: dict, ref_counts: dict,
                 names_new: dict[tuple[str, str], dict]) -> dict:
     type_verdict = type_service.compare_specs(old["type"], new["type"])
+    unit_verdict = units.diff_unit(old, new)
     rename = old["name"] != new["name"]
     case_only = rename and old["name"].lower() == new["name"].lower()
     req = direction.required_change(old["required"], new["required"])
@@ -137,11 +145,18 @@ def judge_field(old: dict, new: dict, ref_counts: dict,
         reasons.append("NAME_DUP_DIFF_ID")
     if table_changed:
         reasons.append("ID_REUSED")
+    # 单位变更单独成因：类型即使判放宽，量纲变了也必须拦截，不能混进 TYPE_WIDEN。
+    if unit_verdict:
+        reasons.append(unit_verdict["reason"])
 
     primary = priority.primary(reasons)
+    unit_changed = bool(unit_verdict)
     cross = conflict or name_clash or table_changed
     if cross:
         bucket = "conflict"
+    elif unit_changed:
+        # 单位变更独立成桶，账目上与换类型分开，迁移单能逐条给出换算依据。
+        bucket = "rescaled"
     elif rename:
         bucket = "renamed"
     elif type_verdict["change"] != "same":
@@ -159,6 +174,8 @@ def judge_field(old: dict, new: dict, ref_counts: dict,
         "rename": rename,
         "deleted_referenced": False,
         "table_changed": table_changed,
+        "unit_changed": unit_changed,
+        "unit_reason": unit_verdict["reason"] if unit_verdict else None,
     }
     reader_view = direction.reader(state)
     writer_view = direction.writer(state)
@@ -194,8 +211,25 @@ def judge_field(old: dict, new: dict, ref_counts: dict,
         "table_changed": table_changed,
         "name_clash": name_clash,
         "type_evidence": type_verdict["evidence"],
+        "unit_change": "rescaled" if unit_changed else "same",
+        "old_unit": unit_verdict["old_unit"] if unit_verdict else _unit_code(old),
+        "new_unit": unit_verdict["new_unit"] if unit_verdict else _unit_code(new),
+        "canonical_unit": (unit_verdict or {}).get("canonical_unit")
+        or _canonical_unit(old, new),
+        "unit_basis": (unit_verdict or {}).get("basis"),
+        "unit_evidence": unit_verdict or {},
     })
     return row
+
+
+def _unit_code(field: dict) -> str | None:
+    gov = field.get("unit_governance") or {}
+    return gov.get("declared_unit") or gov.get("canonical_unit")
+
+
+def _canonical_unit(old: dict, new: dict) -> str | None:
+    gov = (new.get("unit_governance") or old.get("unit_governance") or {})
+    return gov.get("canonical_unit")
 
 
 def diff_pair(fields_old: list[dict], fields_new: list[dict],
